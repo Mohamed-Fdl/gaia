@@ -12,7 +12,7 @@ import {
 
 import { generateWords } from './openai.js'
 
-import { VerifyDiscordRequest, getRandomEmoji, DiscordRequest } from './utils.js'
+import { VerifyDiscordRequest, DiscordRequest } from './utils.js'
 
 import {
     SYNONYMOUS_COMMAND,
