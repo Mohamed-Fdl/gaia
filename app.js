@@ -10,6 +10,8 @@ import {
     ButtonStyleTypes,
 } from 'discord-interactions';
 
+import { isModerate, synonymPrompt, antonymPrompt } from './openai.js'
+
 import { VerifyDiscordRequest, getRandomEmoji, DiscordRequest } from './utils.js';
 
 import { getShuffledOptions, getResult } from './game.js';
@@ -33,129 +35,159 @@ app.post('/interactions', async function(req, res) {
 
     const { type, id, data } = req.body;
 
-
     if (type === InteractionType.PING) {
         return res.send({ type: InteractionResponseType.PONG });
     }
 
-    //  console.log(req.body)
-    console.log(req.body.data)
 
-    /*
-            if (type === InteractionType.APPLICATION_COMMAND) {
-                const { name } = data;
+    if (type === InteractionType.APPLICATION_COMMAND) {
+        const { name, options } = data;
+
+        let prompt = options[0].value
+
+        if (name === 'synonym') {
 
 
-                if (name === 'test') {
+            if (await isModerate(prompt)) {
 
-                    return res.send({
+                /*console.log('we can continue')
+
+                const result = await synonymPrompt(prompt)
+
+                console.log(result)*/
+
+
+                setTimeout(() => {
+
+                    res.send({
                         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                         data: {
-                            content: 'hello world ' + getRandomEmoji(),
+                            content: 'result'
                         },
-                    });
-                }
-                if (name === 'edit_text' && id) {
+                    })
 
-                    console.log('le challenge commence')
+                }, 10000);
+            } else {
+                return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: {
+                        content: 'You message is not appropriate'
+                    },
+                });
+            }
+        }
+        if (name === 'antonym') {
 
-                    const userId = req.body.member.user.id;
+            const result = await antonymPrompt(prompt)
 
-                    const objectName = req.body.data.options[0].value;
+            return res.send({
+                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                data: {
+                    content: result
+                },
+            });
+        }
+        /* if (name === 'edit_text' && id) {
+
+             console.log('le challenge commence')
+
+             const userId = req.body.member.user.id;
+
+             const objectName = req.body.data.options[0].value;
 
 
-                    activeGames[id] = {
-                        id: userId,
-                        objectName,
-                    };
+             activeGames[id] = {
+                 id: userId,
+                 objectName,
+             };
 
-                    return res.send({
-                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                        data: {
+             return res.send({
+                 type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                 data: {
 
-                            content: `Rock papers scissors challenge from <@${userId}>`,
+                     content: `Rock papers scissors challenge from <@${userId}>`,
+                     components: [{
+                         type: MessageComponentTypes.ACTION_ROW,
+                         components: [{
+                             type: MessageComponentTypes.BUTTON,
+                             custom_id: `accept_button_${req.body.id}`,
+                             label: 'Accept',
+                             style: ButtonStyleTypes.PRIMARY,
+                         }, ],
+                     }, ],
+                 },
+             });
+         }*/
+    }
+
+    if (type === InteractionType.MESSAGE_COMPONENT) {
+
+        console.log('interactions message')
+
+        const componentId = data.custom_id;
+
+        if (componentId.startsWith('accept_button_')) {
+
+            console.log('interactions message etape 1')
+
+            const gameId = componentId.replace('accept_button_', '');
+            const endpoint = `webhooks/${process.env.APP_ID}/${req.body.token}/messages/${req.body.message.id}`;
+            try {
+                await res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: {
+                        content: 'What is your object of choice?',
+                        flags: InteractionResponseFlags.EPHEMERAL,
+                        components: [{
+                            type: MessageComponentTypes.ACTION_ROW,
                             components: [{
-                                type: MessageComponentTypes.ACTION_ROW,
-                                components: [{
-                                    type: MessageComponentTypes.BUTTON,
-                                    custom_id: `accept_button_${req.body.id}`,
-                                    label: 'Accept',
-                                    style: ButtonStyleTypes.PRIMARY,
-                                }, ],
+                                type: MessageComponentTypes.STRING_SELECT,
+                                custom_id: `select_choice_${gameId}`,
+                                options: getShuffledOptions(),
                             }, ],
-                        },
-                    });
-                }
+                        }, ],
+                    },
+                });
+                await DiscordRequest(endpoint, { method: 'DELETE' });
+            } catch (err) {
+                console.error('Error sending message:', err);
             }
 
-            if (type === InteractionType.MESSAGE_COMPONENT) {
+        } else if (componentId.startsWith('select_choice_')) {
 
-                console.log('interactions message')
+            console.log('interactions message etape 2')
 
-                const componentId = data.custom_id;
+            const gameId = componentId.replace('select_choice_', '');
 
-                if (componentId.startsWith('accept_button_')) {
+            if (activeGames[gameId]) {
+                const userId = req.body.member.user.id;
+                const objectName = data.values[0];
+                const resultStr = getResult(activeGames[gameId], {
+                    id: userId,
+                    objectName,
+                });
 
-                    console.log('interactions message etape 1')
+                delete activeGames[gameId];
+                const endpoint = `webhooks/${process.env.APP_ID}/${req.body.token}/messages/${req.body.message.id}`;
 
-                    const gameId = componentId.replace('accept_button_', '');
-                    const endpoint = `webhooks/${process.env.APP_ID}/${req.body.token}/messages/${req.body.message.id}`;
-                    try {
-                        await res.send({
-                            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                            data: {
-                                content: 'What is your object of choice?',
-                                flags: InteractionResponseFlags.EPHEMERAL,
-                                components: [{
-                                    type: MessageComponentTypes.ACTION_ROW,
-                                    components: [{
-                                        type: MessageComponentTypes.STRING_SELECT,
-                                        custom_id: `select_choice_${gameId}`,
-                                        options: getShuffledOptions(),
-                                    }, ],
-                                }, ],
-                            },
-                        });
-                        await DiscordRequest(endpoint, { method: 'DELETE' });
-                    } catch (err) {
-                        console.error('Error sending message:', err);
-                    }
-
-                } else if (componentId.startsWith('select_choice_')) {
-
-                    console.log('interactions message etape 2')
-
-                    const gameId = componentId.replace('select_choice_', '');
-
-                    if (activeGames[gameId]) {
-                        const userId = req.body.member.user.id;
-                        const objectName = data.values[0];
-                        const resultStr = getResult(activeGames[gameId], {
-                            id: userId,
-                            objectName,
-                        });
-
-                        delete activeGames[gameId];
-                        const endpoint = `webhooks/${process.env.APP_ID}/${req.body.token}/messages/${req.body.message.id}`;
-
-                        try {
-                            await res.send({
-                                type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                                data: { content: resultStr },
-                            });
-                            await DiscordRequest(endpoint, {
-                                method: 'PATCH',
-                                body: {
-                                    content: 'Nice choice ' + getRandomEmoji(),
-                                    components: [],
-                                },
-                            });
-                        } catch (err) {
-                            console.error('Error sending message:', err);
-                        }
-                    }
+                try {
+                    await res.send({
+                        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                        data: { content: resultStr },
+                    });
+                    await DiscordRequest(endpoint, {
+                        method: 'PATCH',
+                        body: {
+                            content: 'Nice choice ' + getRandomEmoji(),
+                            components: [],
+                        },
+                    });
+                } catch (err) {
+                    console.error('Error sending message:', err);
                 }
-            }*/
+            }
+        }
+    }
 });
 
 

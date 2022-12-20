@@ -19,26 +19,56 @@ export async function isModerate(prompt) {
 
 export async function synonymPrompt(prompt) {
 
-    const moderation = await openai.createEdit({
-        model: "text-davinci-edit-001",
-        input: prompt,
-        instruction: "Write a synonym for this sentence",
-        temperature: 1
-    });
+    try {
 
-    return moderation.data.choices[0].text
+        const edition = await openai.createEdit({
+            model: "text-davinci-edit-001",
+            input: prompt,
+            instruction: "Write a synonym for this sentence",
+            temperature: 1,
+            n: 1
+        }, {
+            timeout: 10000,
+        });
+
+        return edition.data.choices[0].text
+    } catch (error) {
+        if (error.response) {
+            console.log(error.response.status);
+            console.log(error.response.data);
+        } else {
+            console.log(error.message);
+        }
+        return 'ERROR'
+    }
+
 }
 
 export async function antonymPrompt(prompt) {
 
-    const moderation = await openai.createEdit({
-        model: "text-davinci-edit-001",
-        input: prompt,
-        instruction: "Write an antonym for this sentence",
-        temperature: 1
-    });
+    try {
 
-    return moderation.data.choices[0].text
+        const edition = await openai.createEdit({
+            model: "text-davinci-edit-001",
+            input: prompt,
+            instruction: "Write an antonym for this sentence",
+            temperature: 1,
+            n: 1
+        }, {
+            timeout: 10000,
+        });
+
+        return edition.data.choices[0].text
+    } catch (error) {
+        if (error.response) {
+            console.log(error.response.status);
+            console.log(error.response.data);
+        } else {
+            console.log(error.message);
+        }
+        return 'ERROR'
+    }
+
 }
 
 async function testRecap(prompt) {
@@ -54,3 +84,7 @@ async function testRecap(prompt) {
     }
 
 }
+
+const s = await synonymPrompt('I am good!!')
+
+console.log(s)
